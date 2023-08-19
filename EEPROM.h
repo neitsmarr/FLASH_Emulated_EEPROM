@@ -6,7 +6,7 @@
 //#include "main.h"
 #include "stm32f0xx_hal.h"
 
-uint16_t FEE_Get_Version(void);
+uint32_t FEE_Get_Version(void);
 uint8_t FEE_Init(uint32_t start_address, uint32_t page_size);
 HAL_StatusTypeDef FEE_Read_Data(uint8_t identifier, uint16_t *data);
 uint8_t FEE_Write_Data(uint8_t identifier, uint16_t data);

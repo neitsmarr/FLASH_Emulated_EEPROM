@@ -4,7 +4,12 @@
 #include "EEPROM.h"
 
 
-enum {FEE_VERSION = 100};
+enum
+{
+	FEE_VERSION_MAJOR = 0x01,
+	FEE_VERSION_MINOR = 0x00,
+	FEE_VERSION_PATCH = 0x00
+};
 
 /* Page status definitions */
 enum page_status_t
@@ -64,9 +69,9 @@ static void Compute_CRC_Table(uint8_t table[256], uint8_t polynomial);
 static uint8_t Calculate_CRC(uint8_t *data, uint8_t length);
 
 
-uint16_t FEE_Get_Version(void)
+uint32_t FEE_Get_Version(void)
 {
-	return FEE_VERSION;
+	return (FEE_VERSION_MAJOR<<16) | (FEE_VERSION_MINOR<<8) | (FEE_VERSION_PATCH);
 }
 
 /**
