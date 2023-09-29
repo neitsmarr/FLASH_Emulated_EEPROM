@@ -2,12 +2,14 @@
 
 /*Includes*/
 #include "EEPROM.h"
+#include <stdlib.h>
+#include <string.h>
 
 
 enum
 {
 	FEE_VERSION_MAJOR = 0x01,
-	FEE_VERSION_MINOR = 0x01,
+	FEE_VERSION_MINOR = 0x03,
 	FEE_VERSION_PATCH = 0x00
 };
 
@@ -22,6 +24,15 @@ enum page_status_t
 
 enum {crc_poly = 0xE0};	//reversed CRC-8-CCITT, Hamming distance = 4 (up to 119 bits)
 enum {payload_size = 3};	//3 bytes
+
+typedef struct eeprom_handle_s
+{
+	uint32_t start_address;
+	uint32_t page_size;
+	uint32_t active_page_address;
+	uint32_t active_page_free_space;	//in records (32 bit)
+	uint8_t lock;
+} eeprom_handle_t;
 
 
 union record_t
@@ -56,14 +67,13 @@ uint32_t FEE_Get_Version(void)
 }
 
 /**
- * @brief  Restore the pages to a known good state in case of page's status
- *   corruption after a power loss.
+ * @brief  Restore the pages to a known good state in case of page's status corruption after a power loss.
  * @param  None.
- * @retval - Flash error code: on write Flash error
- *         - FLASH_COMPLETE: on success
+ * @retval - Pointer to EEPROM handle
  */
-uint8_t FEE_Init(eeprom_handle_t *heeprom)
+eeprom_handle_t *FEE_Init(uint32_t start_address, uint32_t page_size)
 {
+	eeprom_handle_t *heeprom;
 	uint32_t page_0_start_address, page_1_start_address;
 	uint8_t page_status_0, page_status_1;
 	uint32_t page_error = 0;
@@ -72,7 +82,13 @@ uint8_t FEE_Init(eeprom_handle_t *heeprom)
 	uint32_t valid_page_address, receive_page_address, erased_page_address;
 	HAL_StatusTypeDef status = HAL_ERROR;
 
+	heeprom = (eeprom_handle_t*) malloc(sizeof(eeprom_handle_t));
+	memset(heeprom, 0, sizeof(eeprom_handle_t));
+
 	Compute_CRC_Table(crc_table, crc_poly);
+
+	heeprom->start_address = start_address;
+	heeprom->page_size = page_size;
 
 	page_0_start_address = heeprom->start_address;
 	page_1_start_address = heeprom->start_address + heeprom->page_size;
@@ -108,7 +124,7 @@ uint8_t FEE_Init(eeprom_handle_t *heeprom)
 		HAL_FLASH_Lock();
 		if (status != HAL_OK)
 		{
-			return status;
+			return NULL;
 		}
 	}
 
@@ -155,14 +171,14 @@ uint8_t FEE_Init(eeprom_handle_t *heeprom)
 		HAL_FLASH_Lock();
 		if (status != HAL_OK)
 		{
-			return status;
+			return NULL;
 		}
 	}
 
 	status = Set_Page_Status(receive_page_address, page_status_active);
 	if (status != HAL_OK)
 	{
-		return status;
+		return NULL;
 	}
 
 	heeprom->active_page_address = receive_page_address;
@@ -172,7 +188,7 @@ uint8_t FEE_Init(eeprom_handle_t *heeprom)
 		status = Format(heeprom);
 		if (status != HAL_OK)
 		{
-			return status;
+			return NULL;
 		}
 
 		heeprom->active_page_address = heeprom->start_address;
@@ -186,9 +202,27 @@ uint8_t FEE_Init(eeprom_handle_t *heeprom)
 		Page_Transfer(heeprom);
 	}
 
-	return HAL_OK;
+	return heeprom;
 }
 
+HAL_StatusTypeDef FEE_Terminate(eeprom_handle_t *heeprom)
+{
+	HAL_StatusTypeDef status;
+	FLASH_EraseInitTypeDef erase_init;
+	uint32_t page_error;
+
+	erase_init.TypeErase   = FLASH_TYPEERASE_PAGES;
+	erase_init.PageAddress = heeprom->start_address;
+	erase_init.NbPages     = 1;
+
+	HAL_FLASH_Unlock();
+	status = HAL_FLASHEx_Erase(&erase_init, &page_error);
+	HAL_FLASH_Lock();
+
+	free(heeprom);
+
+	return status;
+}
 
 /**
  * @brief  Returns the last stored variable data, if found, which correspond to
