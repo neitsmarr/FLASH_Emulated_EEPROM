@@ -10,7 +10,7 @@ enum
 {
 	FEE_VERSION_MAJOR = 0x01,
 	FEE_VERSION_MINOR = 0x03,
-	FEE_VERSION_PATCH = 0x00
+	FEE_VERSION_PATCH = 0x01
 };
 
 /* Page status definitions */
@@ -386,7 +386,6 @@ static HAL_StatusTypeDef Get_Record(eeprom_handle_t *heeprom, uint8_t identifier
 
 		if(record.field.id == identifier)
 		{
-			GPIOB->BSRR = GPIO_PIN_3;	//TODO for test only, to remove
 			status = Check_Record_Integrity(record);
 			*data = record.field.data;	//data will be returned even it is corrupted
 			break;
